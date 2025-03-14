@@ -1,0 +1,28 @@
+global:
+  image:
+    # Required to be set by parent chart
+    baseRegistry: registry.neurox.com
+    pullPolicy: Always
+    pullSecretName: neurox-image-registry
+
+  log:
+    level: info
+    pretty: true
+    requests: false
+
+# Used by parent chart to enable/disable this chart
+# Keep commented otherwise the agent will always render
+# enabled: true
+
+image:
+  pullPolicy: ''
+  repository: workload-agent
+  # defaults to the agent chart version but can be overridden
+  #tag: latest
+metricsInterval: 15
+# true when used in dev
+mockData: false
+
+service:
+  containerPort: 8000
+  port: 80

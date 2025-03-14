@@ -1,0 +1,50 @@
+global:
+  controlHost: ''
+
+  configmap:
+    name: neurox-workload-cluster
+    key: clusterId
+
+  image:
+    # Required to be set by parent chart
+    baseRegistry: registry.neurox.com
+    pullPolicy: Always
+    pullSecretName: neurox-image-registry
+
+  scheduling:
+    affinity: {}
+    nodeSelector: {}
+    tolerations: []
+
+  workloadCluster:
+    name: ''
+    local: false
+
+  chartConfigMap:
+    nameSuffix: chart
+    workloadKeys:
+      name: workloadName
+      version: workloadVersion
+
+  log:
+    level: info
+    pretty: true
+    requests: false
+
+api:
+  host: ''
+  port: 443
+fullnameOverride: ''
+image:
+  pullPolicy: ''
+  repository: workload-manager
+  # defaults to the chart version but can be overridden
+  # tag: latest
+replicaCount: 1
+secret:
+  name: neurox-control-auth
+  key: shared-secret
+service:
+  port: 80
+workloadNamespaces:
+  - neurox-workloads

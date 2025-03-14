@@ -1,0 +1,100 @@
+{{- $chart := .Values.global.chartConfigMap }}
+{{- $config := .Values.global.configConfigMap }}
+{{- $controlFullName := include "neurox-control.fullname" . }}
+{{- $hostPrimary := include "neurox-control.host.primary" . }}
+{{- $workloadDetails := (include "neurox-control.subchartDetails.workload" .) | fromJson }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ $controlFullName }}-{{ $config.nameSuffix }}"
+  namespace: {{ .Release.Namespace }}
+data:
+  {{ $config.domainKey }}: "{{ .Values.global.domain }}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ $controlFullName }}-{{ $chart.nameSuffix }}"
+  namespace: {{ .Release.Namespace }}
+data:
+  {{ $chart.workloadKeys.name }}: '{{ $workloadDetails.name }}'
+  {{ $chart.workloadKeys.repository }}: '{{ $workloadDetails.repository }}'
+  {{ $chart.workloadKeys.version }}: '{{ $workloadDetails.version }}'
+  {{ $chart.controlKeys.name }}: {{ .Chart.Name }}
+  {{ $chart.controlKeys.version }}: {{ .Chart.Version }}
+  {{ $chart.controlKeys.values }}: |
+    {{ toYaml .Values | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ $controlFullName }}-sso"
+  namespace: {{ .Release.Namespace }}
+data:
+  config: |
+    vouch:
+      allowAllUsers: true
+
+      cookie:
+        domain: {{ $hostPrimary }}
+        maxAge: {{ .Values.sso.expiresIn | default 240 | int }}
+
+      document_root: /sso
+
+      headers:
+        # Uncomment when debugging claims
+        # idtoken: X-Vouch-IdP-IdToken
+        claims: {{ toYaml .Values.global.sso.claims | nindent 10 }}
+        claimheader: {{ .Values.global.sso.headerPrefix }}
+
+      jwt:
+        maxAge: {{ .Values.sso.expiresIn | default 240 | int }}
+
+      post_logout_redirect_uris:
+        - https://{{ $hostPrimary }}
+
+    oauth:
+      provider: oidc
+
+      # External URls
+      auth_url: https://{{ $hostPrimary }}/idp/auth/local
+      callback_url: https://{{ $hostPrimary }}/sso/auth
+
+      # Internal URLs
+      token_url: http://{{ $controlFullName }}-idp.{{ .Release.Namespace }}:5556/idp/token
+      user_info_url: http://{{ $controlFullName }}-idp.{{ .Release.Namespace }}:5556/idp/userinfo
+
+      scopes:
+        - email
+        - federated:id
+        - groups
+        - openid
+        - profile
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ $controlFullName }}-relay-server"
+  namespace: {{ .Release.Namespace }}
+data:
+  config.yaml: |
+    services:
+    - name: {{ $controlFullName }}-relay-server
+      addr: :8080
+      handler:
+        type: tunnel
+        metadata:
+          entrypoint: ":7080"
+          ingress: {{ $controlFullName }}-relay-server
+      listener:
+        type: ws
+    ingresses:
+    - name: {{ $controlFullName }}-relay-server
+      reload: 10s
+      redis:
+        addr: {{ .Values.global.redis.fullnameOverride}}.{{ .Release.Namespace }}.svc.cluster.local:6379
+        db: 0
+        password: "${REDIS_PASSWORD}"
+        key: {{ .Values.global.relay.configKey }}
+        type: hash

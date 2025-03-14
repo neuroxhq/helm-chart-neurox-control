@@ -1,0 +1,198 @@
+# ClusterRole intended for RoleBindings (e.g. namespaced resources)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: '{{ include "neurox-workload-manager.fullname" . }}-namespaced'
+rules:
+  # Grant full access to Pods
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+      - deletecollection
+  # Grant access to Pod logs
+  - apiGroups:
+      - ""
+    resources:
+      - pods/log
+    verbs:
+      - get
+      - list
+  # Grant full access to Pod status (to manage Pod lifecycle)
+  - apiGroups:
+      - ""
+    resources:
+      - pods/status
+    verbs:
+      - get
+      - update
+      - patch
+  # Grant full access to Deployments
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+      - deletecollection
+  # Grant full access to Deployment status
+  - apiGroups:
+      - apps
+    resources:
+      - deployments/status
+    verbs:
+      - get
+      - update
+      - patch
+  # Grant full access to StatefulSets
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+      - deletecollection
+  # Grant full access to StatefulSet status
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets/status
+    verbs:
+      - get
+      - update
+      - patch
+  # Grant full access to DaemonSets
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+      - deletecollection
+  # Grant full access to DaemonSet status
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets/status
+    verbs:
+      - get
+      - update
+      - patch
+  # Grant full access to ReplicaSets
+  - apiGroups:
+      - apps
+    resources:
+      - replicasets
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+      - deletecollection
+  # Grant full access to ReplicaSet status
+  - apiGroups:
+      - apps
+    resources:
+      - replicasets/status
+    verbs:
+      - get
+      - update
+      - patch
+  # Grant full access to Job controller
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+      - deletecollection
+  # Grant full access to CronJob controller
+  - apiGroups:
+      - batch
+    resources:
+      - cronjobs
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+      - deletecollection
+  # Grant full access to configmaps and secrets
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - secrets
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+---
+# ClusterRole intended for ClusterRoleBinding (e.g. cluster resources)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: '{{ include "neurox-workload-manager.fullname" . }}-cluster'
+rules:
+  # Grant read access to Namespaces, Nodes, and Pods
+  - apiGroups:
+      - ""
+      - events.k8s.io
+    resources:
+      - events
+      - namespaces
+      - nodes
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  # Grant read access to Node status
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/status
+    verbs:
+      - get

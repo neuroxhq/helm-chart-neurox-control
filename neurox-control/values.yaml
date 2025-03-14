@@ -1,0 +1,258 @@
+global:
+  domain: ""
+  fullnameOverride: ""
+  identityProviders:
+    # The names of the identity provider(s) to use
+    # Empty array by default (local login only)
+    # Accepts "google" (more coming soon)
+    enabled: []
+    # Only used if google is listed above
+    google:
+      # Must be set to a list of domains associated with your google OAuth app
+      allowedDomains: []
+      secret:
+        key:
+          id: clientId
+          secret: clientSecret
+        name: neurox-control-idp-google
+  image:
+    baseRegistry: registry.neurox.com
+    pullPolicy: Always
+    pullSecretName: neurox-image-registry
+  ingress:
+    annotations: {}
+    className: nginx
+    issuerName: neurox-control
+    tlsSecretName: neurox-control-tls
+    useNeuroxIssuer: true
+  license:
+    secret:
+      name: neurox-control-license
+      key: installKey
+  redis:
+    fullnameOverride: &redisFullname neurox-control-redis
+    secret:
+      name: &redisSecretName neurox-control-redis
+      key: &redisSecretKey password
+  relay:
+    apiPort: 7080
+    configKey: deploy:workload-clusters
+  scheduler:
+    queueName: Scheduler
+  # Where to run the control chart pods
+  scheduling:
+    affinity: {}
+    nodeSelector: {}
+    tolerations: []
+  sso:
+    claims:
+      - email
+      - email_verified
+      - federated_claims
+      - name
+      - preferred_username
+    expiresIn: 1440
+    headerPrefix: x-vouch-idp-claims-
+  # Used for subcharts and service routing
+  thanos:
+    fullnameOverride: &thanosFullname neurox-control-thanos
+  # Workload subchart global options
+  workloadCluster:
+    local: true
+    name: local-cluster
+  # Passes corresponding workload chart version to api subchart
+  chartConfigMap:
+    nameSuffix: chart
+    controlKeys:
+      name: controlName
+      version: controlVersion
+      values: controlValues
+    workloadKeys:
+      name: workloadName
+      repository: workloadRepository
+      values: workloadValues
+      version: workloadVersion
+  configConfigMap:
+    nameSuffix: config
+    domainKey: domain
+  # Create dynamic manifests via values.
+  # For example:
+  # extraObjects:
+  #   - |
+  #     apiVersion: v1
+  #     kind: ConfigMap
+  #     metadata:
+  #       name: 'my-extra-configmap'
+  extraObjects: []
+  log:
+    level: info
+    pretty: true
+    requests: false
+api:
+  fullnameOverride: ""
+  image:
+    init:
+      pullPolicy: ""
+      repository: busybox
+      tag: 1.37.0-glibc
+    run:
+      pullPolicy: ""
+      repository: control-api
+  ingress:
+    annotations: {}
+    className: ""
+    tlsSecretName: ""
+  replicaCount: 1
+  secret:
+    workloadAuth:
+      name: neurox-control-auth
+      key: shared-secret
+  service:
+    port: 80
+idp:
+  image:
+    init:
+      pullPolicy: ""
+      repository: httpd
+      tag: 2.4.62
+    run:
+      pullPolicy: ""
+      repository: ghcr.io/dexidp/dex
+      tag: v2.41.1
+  ingress:
+    annotations: {}
+    host: ""
+    tlsSecretName: ""
+  local:
+    secret:
+      key: password
+      name: neurox-control-idp-local
+metrics:
+  ingress:
+    enabled: true
+    annotations: {}
+    host: ""
+    tlsSecretName: ""
+portal:
+  enabled: true
+  fullnameOverride: ""
+  image:
+    repository: control-portal
+    pullPolicy: ""
+  ingress:
+    annotations: {}
+    tlsSecretName: ""
+  replicaCount: 1
+  service:
+    port: 80
+redis:
+  architecture: replication
+  auth:
+    existingSecret: *redisSecretName
+    existingSecretPasswordKey: *redisSecretKey
+  fullnameOverride: *redisFullname
+  replica:
+    replicaCount: 3
+  sentinel:
+    enabled: true
+    quorum: 2
+register:
+  image:
+    kubectl:
+      repository: bitnami/kubectl
+      tag: 1.31.1
+    nginx:
+      repository: nginx
+      tag: 1.27.1-alpine
+  service:
+    port: 80
+    type: ClusterIP
+relay:
+  image:
+    init:
+      pullPolicy: ""
+      repository: busybox
+      tag: 1.37.0-glibc
+    run:
+      pullPolicy: ""
+      repository: gogost/gost
+      tag: 3.0.0
+  ingress:
+    annotations: {}
+    enabled: true
+    host: ""
+    tlsSecretName: ""
+  service:
+    relayPort: 8080
+scheduler:
+  enabled: true
+  image:
+    init:
+      pullPolicy: ""
+      repository: busybox
+      tag: 1.37.0-glibc
+    run:
+      pullPolicy: ""
+      repository: control-scheduler
+  replicaCount: 1
+sso:
+  image:
+    pullPolicy: ""
+    repository: quay.io/vouch/vouch-proxy
+    tag: 0.40.0
+  ingress:
+    annotations: {}
+    host: ""
+    tlsSecretName: ""
+  secret:
+    key:
+      id: clientID
+      secret: clientSecret
+    name: neurox-control-sso-internal
+thanos:
+  enabled: true
+  fullnameOverride: *thanosFullname
+  query:
+    dnsDiscovery:
+      enabled: false
+    replicaLabel:
+      - prometheus_replica
+      - prometheus
+      - receive
+      - replica
+      - neurox_replica
+    stores:
+      - dnssrv+_grpc._tcp.neurox-control-thanos-receive
+    serviceAccount:
+      name: neurox-control-thanos-query
+    resources:
+      limits:
+        cpu: 2
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+  queryFrontend:
+    enabled: false
+  receive:
+    enabled: true
+    tsdbRetention: 183d
+    serviceAccount:
+      name: neurox-control-thanos-receive
+    resources:
+      limits:
+        cpu: 2
+        memory: 4Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+    persistence:
+      enabled: true
+      size: 100Gi
+    replicaLabel: neurox_replica
+  objstoreConfig: |-
+    type: FILESYSTEM
+    config:
+      directory: "/var/thanos/receive/default-tenant"
+workload:
+  enabled: false

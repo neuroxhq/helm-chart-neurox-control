@@ -1,0 +1,88 @@
+global:
+  controlHost: ""
+
+  configmap:
+    name: neurox-workload-cluster
+    key: clusterId
+
+  image:
+    baseRegistry: registry.neurox.com
+    pullPolicy: Always
+    pullSecretName: neurox-image-registry
+
+  scheduling:
+    affinity: {}
+    nodeSelector: {}
+    tolerations: []
+
+  workloadCluster:
+    name: ""
+    local: false
+
+  chartConfigMap:
+    nameSuffix: chart
+    workloadKeys:
+      name: workloadName
+      values: workloadValues
+      version: workloadVersion
+
+  log:
+    level: info
+    pretty: true
+    requests: false
+
+enabled: true
+
+agent:
+  # enabled: true
+  image:
+    pullPolicy: ""
+    repository: workload-agent
+    # defaults to the agent chart version but can be overridden
+    #tag: latest
+  service:
+    port: 80
+
+hooks:
+  image:
+    repository: bitnami/kubectl
+    tag: 1.31.1
+
+manager:
+  # enabled: true
+  fullnameOverride: ""
+  image:
+    pullPolicy: ""
+    repository: workload-manager
+    # defaults to the workload-manager chart version but can be overridden
+    # tag: latest
+  replicaCount: 1
+  secret:
+    name: neurox-control-auth
+    key: shared-secret
+  service:
+    port: 80
+  workloadNamespaces:
+    - neurox-workloads
+
+prometheus:
+  enabled: true
+  extraMetrics: []
+  remoteWrite:
+    host: ""
+    path: /metrics/v1/receive
+    port: 443
+
+relay:
+  image:
+    init:
+      pullPolicy: ""
+      repository: busybox
+      tag: 1.37.0-glibc
+    run:
+      pullPolicy: Always
+      repository: gogost/gost
+      tag: 3.0.0
+  server:
+    host: ""
+    port: 443

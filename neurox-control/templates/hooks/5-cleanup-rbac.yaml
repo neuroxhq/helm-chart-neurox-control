@@ -1,0 +1,76 @@
+{{- $cleanUpRegistration := (and .Values.global.ingress.useNeuroxIssuer (include "neurox-control.useNeuroxDomain" .)) }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-failed
+    "helm.sh/hook-weight": "7"
+  name: '{{ include "neurox-control.fullname" . }}-rbac-cleanup-job-hook'
+  namespace: "{{ .Release.Namespace }}"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-failed
+    "helm.sh/hook-weight": "7"
+  name: '{{ include "neurox-control.fullname" . }}-rbac-cleanup-job-hook'
+  namespace: "{{ .Release.Namespace }}"
+rules:
+  - apiGroups:
+      - "rbac.authorization.k8s.io"
+    resources:
+      - "roles"
+    resourceNames:
+      - '{{ include "neurox-control.fullname" . }}-secrets-job-hook'
+    {{- if $cleanUpRegistration }}
+      - '{{ include "neurox-control.fullname" . }}-registration-job-hook'
+      - '{{ include "neurox-control.fullname" . }}-registration-cleanup-job-hook'
+    {{- end }}
+    verbs:
+      - "delete"
+  - apiGroups:
+      - "rbac.authorization.k8s.io"
+    resources:
+      - "rolebindings"
+    resourceNames:
+      - '{{ include "neurox-control.fullname" . }}-secrets-job-hook'
+      - '{{ include "neurox-control.fullname" . }}-rbac-cleanup-job-hook'
+    {{- if $cleanUpRegistration }}
+      - '{{ include "neurox-control.fullname" . }}-registration-job-hook'
+      - '{{ include "neurox-control.fullname" . }}-registration-cleanup-job-hook'
+    {{- end }}
+    verbs:
+      - "delete"
+  - apiGroups:
+      - ""
+    resources:
+      - "serviceaccounts"
+    resourceNames:
+      - '{{ include "neurox-control.fullname" . }}-secrets-job-hook'
+    {{- if $cleanUpRegistration }}
+      - '{{ include "neurox-control.fullname" . }}-registration-job-hook'
+      - '{{ include "neurox-control.fullname" . }}-registration-cleanup-job-hook'
+    {{- end }}
+    verbs:
+      - "delete"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-failed
+    "helm.sh/hook-weight": "8"
+  name: '{{ include "neurox-control.fullname" . }}-rbac-cleanup-job-hook'
+  namespace: "{{ .Release.Namespace }}"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "neurox-control.fullname" . }}-rbac-cleanup-job-hook'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "neurox-control.fullname" . }}-rbac-cleanup-job-hook'

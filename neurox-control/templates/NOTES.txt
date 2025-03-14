@@ -1,0 +1,12 @@
+Congratulations! You have successfully installed release "{{.Release.Name }}" of Neurox Control Cluster!
+
+To access the Neurox Web Portal, follow these steps:
+
+1. Run the command below to get the local administrator password:
+```
+kubectl get secret -n {{ .Release.Namespace }} {{ .Values.idp.local.secret.name }} -o jsonpath="{.data.{{ .Values.idp.local.secret.key }}}" | base64 --decode
+```
+
+2. Open the following URL in your browser: https://{{include "neurox-control.host.primary" . }}
+
+3. Log in with the email setup@neurox.com and the password from step 1.

@@ -1,0 +1,17 @@
+{{- if and .Values.global.ingress.useNeuroxIssuer (include "neurox-control.useNeuroxDomain" .) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "{{ .Values.global.ingress.issuerName }}"
+  namespace: "{{ .Release.Namespace }}"
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: '{{ include "neurox-control.fullname" . }}-issuer'
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: "{{ .Values.global.ingress.className }}"
+{{- end }}
