@@ -1,0 +1,242 @@
+{{- if and .Values.global.ingress.useNeuroxIssuer (include "neurox-control.useNeuroxDomain" .) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: '{{ include "neurox-control.fullname" . }}-registration-job-hook'
+  namespace: "{{ .Release.Namespace }}"
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "3"
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+    {{- if .Values.global.scheduling.affinity }}
+      affinity: {{ toYaml .Values.global.scheduling.affinity | nindent 8 }}
+    {{- end }}
+      initContainers:
+        - name: get-lb-location
+          image: "{{ .Values.register.image.kubectl.repository }}:{{ .Values.register.image.kubectl.tag }}"
+          command:
+            - /bin/sh
+          args:
+            - -c
+            - |
+              API_INGRESS='{{ include "neurox-control.fullname" . }}-api'
+              MANIFESTS="/manifests"
+              REGISTRATION_INGRESS='{{ include "neurox-control.fullname" . }}-registration'
+
+              # Function to get the LoadBalancer hostname from the Ingress
+              get_lb_hostname() {
+                local ingress_name=$1
+                kubectl get ingress "${ingress_name}" -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+              }
+
+              # Function to get the LoadBalancer IP from the Ingress
+              get_lb_ip() {
+                local ingress_name=$1
+                kubectl get ingress "${ingress_name}" -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+              }
+
+              DOMAIN_ALREADY_REGISTERED=''
+              API_LB_HOSTNAME=$(get_lb_hostname ${API_INGRESS})
+              API_LB_IP=$(get_lb_ip ${API_INGRESS})
+              if [ -n "${API_LB_HOSTNAME}" ]
+              then
+                echo "API LoadBalancer is using hostname ${API_LB_HOSTNAME}"
+                if getent hosts "${NEUROX_DOMAIN}" | awk '{print $2}' | grep -q -x "${API_LB_HOSTNAME}"
+                then
+                  echo "${NEUROX_DOMAIN} already registered to API LoadBalancer at ${API_LB_HOSTNAME}"
+                  DOMAIN_ALREADY_REGISTERED='true'
+                fi
+              elif [ -n "${API_LB_IP}" ]
+              then
+                echo "API LoadBalancer is using ip ${API_LB_IP}"
+                if getent hosts "${NEUROX_DOMAIN}" | awk '{print $1}' | grep -q -x "${API_LB_IP}"
+                then
+                  echo "${NEUROX_DOMAIN} already registered to API LoadBalancer at ${API_LB_IP}"
+                  DOMAIN_ALREADY_REGISTERED='true'
+                fi
+              fi
+
+              VANITY_DOMAIN_ALREADY_REGISTERED=''
+              if [ -n "${NEUROX_VANITY_DOMAIN}" ]
+              then
+                VANITY_DOMAIN_HOSTNAME=$(getent hosts ${NEUROX_VANITY_DOMAIN} | awk '{print $2}')
+                if [ "${VANITY_DOMAIN_HOSTNAME}" = "${NEUROX_DOMAIN}" ]
+                then
+                  echo "${NEUROX_VANITY_DOMAIN} already registered to ${NEUROX_DOMAIN}"
+                  VANITY_DOMAIN_ALREADY_REGISTERED='true'
+                fi
+              fi
+
+              # Skip registration process if all domains match expected DNS records
+              if [ -n "${DOMAIN_ALREADY_REGISTERED}" ]
+              then
+                # Only skip after domain match if no vanity domain OR vanity domain already registered
+                if [ ! -n "${NEUROX_VANITY_DOMAIN}" ] || [ -n "${VANITY_DOMAIN_ALREADY_REGISTERED}" ]
+                then
+                  echo "Domain(s) already registered, skipping registration..."
+                  echo '{"registered":true}' > "${LOCATION_FILE}"
+                  exit 0
+                fi
+              fi
+
+              # Ensure ingress manifest exists
+              if [ ! -f "${MANIFESTS}/ingress.yaml" ]
+              then
+                echo "No registration ingress manifest found, exiting with failure..."
+                exit 1
+              fi
+
+              # Create the registration resources
+              kubectl apply -f "${MANIFESTS}"
+              # Exit 1 if resources not successfully created
+              if [ $? -ne 0 ]; then
+                  echo "Error creating required registration resources, exiting with failure..."
+                  exit 1
+              fi
+
+              attempt=1
+              while [ "$attempt" -le "${MAX_RETRIES}" ]
+              do
+                echo "Attempt $attempt of ${MAX_RETRIES} to retrieve ingress LoadBalancer location..."
+
+                # Check if location actually exists
+                LB_HOSTNAME=$(get_lb_hostname ${REGISTRATION_INGRESS})
+                LB_IP=$(get_lb_ip ${REGISTRATION_INGRESS})
+                if [ -n "${LB_HOSTNAME}" ]
+                then
+                  echo "Successfully retrieved ${REGISTRATION_INGRESS} LoadBalancer hostname: ${LB_HOSTNAME}"
+                  echo "{\"hostname\": \"${LB_HOSTNAME}\"}" > "${LOCATION_FILE}"
+                  echo "Hostname address written to ${LOCATION_FILE}"
+                  exit 0
+                elif [ -n "${LB_IP}" ]
+                then
+                  echo "Successfully retrieved ${REGISTRATION_INGRESS} LoadBalancer IP: ${LB_IP}"
+                  echo "{\"ip\": \"${LB_IP}\"}" > "${LOCATION_FILE}"
+                  echo "IP address written to ${LOCATION_FILE}"
+                  exit 0
+                else
+                  echo "Failed to retrieve ingress LoadBalancer location. Retrying in ${RETRY_INTERVAL} seconds..."
+                  sleep "${RETRY_INTERVAL}"
+                fi
+
+                # Increment the attempt counter
+                attempt=$((attempt + 1))
+              done
+
+              echo "Failed to retrieve ingress LoadBalancer location, exiting with failure..."
+              exit 1
+          env:
+            - name: LOCATION_FILE
+              value: /shared/location.json
+            - name: NEUROX_DOMAIN
+              value: "{{ .Values.global.domain }}"
+          {{- if .Values.global.vanityDomain }}
+            - name: NEUROX_VANITY_DOMAIN
+              value: "{{ .Values.global.vanityDomain }}"
+          {{- end }}
+            - name: MAX_RETRIES
+              value: '20'
+            - name: RETRY_INTERVAL
+              value: '10'
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - mountPath: /manifests
+              name: manifests
+            - mountPath: /shared
+              name: shared
+        - name: register
+          image: '{{ include "neurox-control.apiImage" . }}'
+          command:
+            - npm
+          args:
+            - run
+            - register
+          env:
+            - name: LOCATION_FILE
+              value: /shared/location.json
+            {{- if .Values.global.cloudHost }}
+            - name: CLOUD_HOST
+              value: "{{ .Values.global.cloudHost }}"
+            {{- end }}
+            - name: NEUROX_DOMAIN
+              value: "{{ .Values.global.domain }}"
+            - name: NEUROX_INSTALL_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.global.license.secret.name }}"
+                  key: "{{ .Values.global.license.secret.key }}"
+          {{- if .Values.global.vanityDomain }}
+            - name: NEUROX_VANITY_DOMAIN
+              value: "{{ .Values.global.vanityDomain }}"
+          {{- end }}
+          {{- if .Values.global.publicKey }}
+            - name: PUBLIC_KEY
+              value: "{{ .Values.global.publicKey }}"
+          {{- end }}
+          volumeMounts:
+            - mountPath: /shared
+              name: shared
+      containers:
+        - name: cleanup
+          image: "{{ .Values.register.image.kubectl.repository }}:{{ .Values.register.image.kubectl.tag }}"
+          command:
+            - /bin/sh
+          args:
+            - -c
+            - |
+              # Always clean up the ConfigMap
+              echo "Cleaning up registration server ConfigMap..."
+              kubectl delete configmap {{ include "neurox-control.fullname" . }}-registration -n ${NAMESPACE}
+
+              # If registration occurred prior, no need to clean up additional resources
+              if cat ${LOCATION_FILE} | grep -q '"registered":true'
+              then
+                echo "Registration occurred, skipping cleanup of additional resources..."
+                exit 0
+              fi
+
+              # Assume resources need to be cleaned up in all other cases
+              echo "Cleaning up all other registration resources..."
+              kubectl delete ingress {{ include "neurox-control.fullname" . }}-registration -n ${NAMESPACE}
+              kubectl delete service {{ include "neurox-control.fullname" . }}-registration -n ${NAMESPACE}
+              kubectl delete deployment {{ include "neurox-control.fullname" . }}-registration -n ${NAMESPACE}
+          env:
+            - name: LOCATION_FILE
+              value: /shared/location.json
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - mountPath: /shared
+              name: shared
+    {{- if .Values.global.scheduling.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.global.scheduling.nodeSelector | nindent 8 }}
+    {{- end }}
+      restartPolicy: Never
+      serviceAccountName: '{{ include "neurox-control.fullname" . }}-registration-job-hook'
+    {{- if .Values.global.scheduling.tolerations }}
+      tolerations: {{ toYaml .Values.global.scheduling.tolerations | nindent 8 }}
+    {{- end }}
+      volumes:
+        - name: shared
+          emptyDir: {}
+        - name: manifests
+          configMap:
+            name: '{{ include "neurox-control.fullname" . }}-registration'
+            items:
+            - key: deployment.yaml
+              path: deployment.yaml
+            - key: ingress.yaml
+              path: ingress.yaml
+            - key: service.yaml
+              path: service.yaml
+{{- end }}

@@ -1,0 +1,47 @@
+{{- if .Values.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: '{{ include "neurox-workload.fullname" . }}-{{ .Values.global.chartConfigMap.nameSuffix }}'
+  namespace: "{{ .Release.Namespace }}"
+data:
+  {{ .Values.global.chartConfigMap.workloadKeys.name }}: {{ .Chart.Name }}
+  {{ .Values.global.chartConfigMap.workloadKeys.version }}: {{ .Chart.Version }}
+  {{ .Values.global.chartConfigMap.workloadKeys.values }}: |
+    {{ toYaml .Values | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: '{{ include "neurox-workload.fullname" . }}-relay-client'
+  namespace: "{{ .Release.Namespace }}"
+data:
+  config.yaml: |
+    services:
+    - name: neurox-workload-manager
+      addr: :0
+      handler:
+        type: rtcp
+      listener:
+        type: rtcp
+        chain: neurox-control-relay-server
+      forwarder:
+        nodes:
+        - name: neurox-workload-manager
+          addr: {{ include "neurox-workload.manager.service.address" . }}
+    chains:
+    - name: neurox-control-relay-server
+      hops:
+      - name: hop-0
+        nodes:
+        - name: neurox-control-relay-server
+          addr: {{ include "neurox-workload.relay.server.address" . }}
+          connector:
+            type: tunnel
+            metadata:
+              tunnel.id: ${CLUSTER_ID}
+              tunnel.weight: 1
+          dialer:
+            type: {{ include "neurox-workload.relay.protocol" . }}
+{{- end }}

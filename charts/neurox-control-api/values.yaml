@@ -1,0 +1,94 @@
+global:
+  domain: ''
+  vanityDomain: ''
+  fullnameOverride: ''
+  identityProviders:
+    # The names of the identity provider(s) to use
+    # Empty array by default (local login only)
+    # Accepts "google" (more coming soon)
+    enabled: []
+    # Only used if google is listed above
+    google:
+      secret:
+        key:
+          id: clientID
+          secret: clientSecret
+        name: neurox-control-idp-google
+  image:
+    # Required to be set by parent chart
+    # baseRegistry: registry.neurox.com
+    pullPolicy: Always
+    pullSecretName: neurox-image-registry
+  ingress:
+    annotations: {}
+    className: nginx
+    issuerName: neurox-control
+    tlsSecretName: neurox-control-tls
+    useNeuroxIssuer: true
+  license:
+    secret:
+      name: neurox-control-license
+      key: install-key
+  redis:
+    fullnameOverride: neurox-control-redis
+    secret:
+      name: neurox-control-redis
+      key: password
+  relay:
+    apiPort: 7080
+    configKey: deploy:workload-clusters
+  scheduler:
+    queueName: 'Scheduler'
+  # Where to run the api pods
+  scheduling:
+    affinity: {}
+    nodeSelector: {}
+    tolerations: []
+  sso:
+    claims:
+      - email
+      - email_verified
+      - federated_claims
+      - name
+      - preferred_username
+    headerPrefix: x-vouch-idp-claims-
+  thanos:
+    fullnameOverride: neurox-control-thanos
+  # ConfigMap created by parent chart that has the workload subchart version
+  chartConfigMap:
+    nameSuffix: chart
+    controlKeys:
+      name: controlName
+      version: controlVersion
+    workloadKeys:
+      name: workloadName
+      repository: workloadRepository
+      version: workloadVersion
+  configConfigMap:
+    nameSuffix: config
+    domainKey: domain
+  nodeEnv: production
+  log:
+    level: info
+    pretty: true
+    requests: false
+
+replicaCount: 1
+image:
+  init:
+    pullPolicy: ''
+    repository: busybox
+    tag: 1.37.0-glibc
+  run:
+    pullPolicy: ''
+    repository: control-api
+ingress:
+  annotations: {}
+  className: ''
+  tlsSecretName: ''
+secret:
+  workloadAuth:
+    name: neurox-control-auth
+    key: shared-secret
+service:
+  port: 80

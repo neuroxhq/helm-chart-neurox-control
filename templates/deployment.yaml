@@ -1,0 +1,266 @@
+{{- $controlFullName := include "neurox-control.fullname" . }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ $controlFullName }}-idp"
+  namespace: "{{ .Release.Namespace }}"
+spec:
+  selector:
+    matchLabels:
+      app: "{{ $controlFullName }}-idp"
+  template:
+    metadata:
+      labels:
+        app: "{{ $controlFullName }}-idp"
+        version: "{{ .Chart.Version }}"
+    spec:
+    {{- if .Values.global.scheduling.affinity }}
+      affinity: {{ toYaml .Values.global.scheduling.affinity | nindent 8 }}
+    {{- end }}
+      initContainers:
+        - name: "{{ $controlFullName }}-idp-init"
+          image: "{{ .Values.idp.image.init.repository }}:{{ .Values.idp.image.init.tag }}"
+          imagePullPolicy: '{{ include "neurox-control.idp.image.init.pullPolicy" . }}'
+          command:
+          - /bin/sh
+          args:
+          - -c
+          - |
+            INPUT_FILE=/config/config.yaml
+            OUTPUT_FILE=/shared/config.yaml
+            EMAIL=setup@neurox.com
+            USERNAME="Neurox Setup"
+            HASH=$(htpasswd -nbBC 10 "$USERNAME" "$PASSWORD" | cut -d ':' -f 2)
+
+            cp $INPUT_FILE $OUTPUT_FILE
+            cat <<EOF >> $OUTPUT_FILE
+
+            staticPasswords:
+              - email: $EMAIL
+                hash: $HASH
+                username: $USERNAME
+                userID: $EMAIL
+            EOF
+          env:
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.idp.local.secret.name }}"
+                  key: "{{ .Values.idp.local.secret.key }}"
+          volumeMounts:
+            - name: config
+              mountPath: /shared
+            - name: initial-config
+              mountPath: /config
+              readOnly: true
+      containers:
+        - name: "{{ $controlFullName }}-idp-run"
+          image: '{{ .Values.idp.image.run.repository }}:{{ .Values.idp.image.run.tag }}'
+          imagePullPolicy: '{{ include "neurox-control.idp.image.run.pullPolicy" . }}'
+          args:
+            - dex
+            - serve
+            - --web-http-addr
+            - 0.0.0.0:5556
+            - --grpc-addr
+            - 0.0.0.0:5557
+            - --telemetry-addr
+            - 0.0.0.0:5558
+            - '/etc/{{ $controlFullName }}-idp/config.yaml'
+          env:
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.sso.secret.name }}"
+                  key: "{{ .Values.sso.secret.key.id }}"
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.sso.secret.name }}"
+                  key: "{{ .Values.sso.secret.key.secret }}"
+          {{- if has "google" .Values.global.identityProviders.enabled }}
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.global.identityProviders.google.secret.name }}"
+                  key: "{{ .Values.global.identityProviders.google.secret.key.id }}"
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Values.global.identityProviders.google.secret.name }}"
+                  key: "{{ .Values.global.identityProviders.google.secret.key.secret }}"
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 5556
+              protocol: TCP
+            - name: grpc
+              containerPort: 5557
+              protocol: TCP
+            - name: telemetry
+              containerPort: 5558
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz/live
+              port: telemetry
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: telemetry
+          volumeMounts:
+            - name: config
+              mountPath: "/etc/{{ $controlFullName }}-idp"
+              readOnly: true
+      volumes:
+        - name: config
+          emptyDir: {}
+        - name: initial-config
+          secret:
+            secretName: "{{ $controlFullName }}-idp"
+    {{- if .Values.global.scheduling.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.global.scheduling.nodeSelector | nindent 8 }}
+    {{- end }}
+      serviceAccountName: "{{ $controlFullName }}-idp"
+    {{- if .Values.global.scheduling.tolerations }}
+      tolerations: {{ toYaml .Values.global.scheduling.tolerations | nindent 8 }}
+    {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ $controlFullName }}-sso"
+spec:
+  selector:
+    matchLabels:
+      app: "{{ $controlFullName }}-sso"
+  template:
+    metadata:
+      labels:
+        app: "{{ $controlFullName }}-sso"
+        version: "{{ .Chart.Version }}"
+    spec:
+    {{- if .Values.global.scheduling.affinity }}
+      affinity: {{ toYaml .Values.global.scheduling.affinity | nindent 8 }}
+    {{- end }}
+      containers:
+      - name: "{{ $controlFullName }}-sso"
+        image: '{{ .Values.sso.image.repository }}:{{ .Values.sso.image.tag }}'
+        imagePullPolicy: '{{ include "neurox-control.sso.image.pullPolicy" . }}'
+        env:
+        - name: VOUCH_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: "{{ $controlFullName }}-sso-jwt"
+              key: jwt
+        - name: OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.sso.secret.name }}"
+              key: "{{ .Values.sso.secret.key.id }}"
+        - name: OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.sso.secret.name }}"
+              key: "{{ .Values.sso.secret.key.secret }}"
+        ports:
+        - containerPort: 9090
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /config
+      volumes:
+      - name: config
+        configMap:
+          name: "{{ $controlFullName }}-sso"
+    {{- if .Values.global.scheduling.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.global.scheduling.nodeSelector | nindent 8 }}
+    {{- end }}
+      serviceAccountName: "{{ $controlFullName }}-sso"
+    {{- if .Values.global.scheduling.tolerations }}
+      tolerations: {{ toYaml .Values.global.scheduling.tolerations | nindent 8 }}
+    {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ $controlFullName }}-relay-server"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ $controlFullName }}-relay-server"
+  template:
+    metadata:
+      labels:
+        app: "{{ $controlFullName }}-relay-server"
+        version: "{{ .Chart.Version }}"
+    spec:
+    {{- if .Values.global.scheduling.affinity }}
+      affinity: {{ toYaml .Values.global.scheduling.affinity | nindent 8 }}
+    {{- end }}
+      initContainers:
+      - name: "{{ $controlFullName }}-relay-server-init"
+        image: "{{ .Values.relay.image.init.repository }}:{{ .Values.relay.image.init.tag }}"
+        imagePullPolicy: '{{ include "neurox-control.relay.image.init.pullPolicy" . }}'
+        command:
+        - bin/sh
+        - -c
+        - |
+          wait_for_service() {
+            local friendly_name="$1"
+            local service_host="$2"
+            local service_port="$3"
+            local sleep_interval="${4:-5}" # Default sleep interval to 5 seconds if not provided
+
+            echo "Checking availability of $friendly_name at $service_host:$service_port..."
+
+            while ! nc -z "$service_host" "$service_port"; do
+              echo "$friendly_name is not available at $service_host:$service_port. Retrying in $sleep_interval seconds..."
+              sleep "$sleep_interval"
+            done
+
+            echo "$friendly_name is now available at $service_host:$service_port."
+          }
+
+          wait_for_service "Redis" {{ include "neurox-control.redis.service" . }} {{ include "neurox-control.redis.port" . }}
+
+          cp /config/original/config.yaml /config/final/config.yaml && \
+          sed -i "s/\${REDIS_PASSWORD}/${REDIS_PASSWORD}/g" /config/final/config.yaml
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.global.redis.secret.name }}"
+              key: "{{ .Values.global.redis.secret.key }}"
+        volumeMounts:
+        - name: original-config
+          mountPath: /config/original
+        - name: final-config
+          mountPath: /config/final
+      containers:
+      - name: "{{ $controlFullName }}-relay-server"
+        image: '{{ .Values.relay.image.run.repository }}:{{ .Values.relay.image.run.tag }}'
+        imagePullPolicy: {{ include "neurox-control.relay.image.run.pullPolicy" . }}
+        args:
+          - '-C=/etc/{{ $controlFullName }}-relay-server/config.yaml'
+        ports:
+        - containerPort: 7080
+        - containerPort: 8080
+        volumeMounts:
+        - name: final-config
+          mountPath: "/etc/{{ $controlFullName }}-relay-server"
+    {{- if .Values.global.scheduling.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.global.scheduling.nodeSelector | nindent 8 }}
+    {{- end }}
+      serviceAccountName: "{{ $controlFullName }}-relay-server"
+    {{- if .Values.global.scheduling.tolerations }}
+      tolerations: {{ toYaml .Values.global.scheduling.tolerations | nindent 8 }}
+    {{- end }}
+      volumes:
+      - name: original-config
+        configMap:
+          name: "{{ $controlFullName }}-relay-server"
+      - name: final-config
+        emptyDir: {}

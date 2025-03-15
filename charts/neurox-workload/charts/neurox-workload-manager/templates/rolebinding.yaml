@@ -1,0 +1,17 @@
+{{- $parent := . }}
+{{- range .Values.workloadNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: '{{ include "neurox-workload-manager.fullname" $parent }}'
+  namespace: "{{ . }}"
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "neurox-workload-manager.fullname" $parent }}'
+    namespace: "{{ $parent.Release.Namespace }}"
+roleRef:
+  kind: ClusterRole
+  name: '{{ include "neurox-workload-manager.fullname" $parent }}-namespaced'
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

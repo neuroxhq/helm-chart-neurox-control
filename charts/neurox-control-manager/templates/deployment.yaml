@@ -1,0 +1,86 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: '{{ include "neurox-control-manager.fullname" . }}'
+  namespace: "{{ .Release.Namespace }}"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: '{{ include "neurox-control-manager.fullname" . }}'
+  template:
+    metadata:
+      labels:
+        app: '{{ include "neurox-control-manager.fullname" . }}'
+        updated: '{{ now.Unix }}'
+        version: "{{ .Chart.Version }}"
+    spec:
+    {{- if .Values.global.scheduling.affinity }}
+      affinity: {{ toYaml .Values.global.scheduling.affinity | nindent 8 }}
+    {{- end }}
+      initContainers:
+      - name: wait-for-dependent-services
+        image: "{{ .Values.image.init.repository }}:{{ .Values.image.init.tag }}"
+        imagePullPolicy: '{{ include "neurox-control-manager.image.init.pullPolicy" . }}'
+        command:
+        - /bin/sh
+        args:
+        - -c
+        - |
+          #!/bin/sh
+          wait_for_service() {
+            local friendly_name="$1"
+            local service_host="$2"
+            local service_port="$3"
+            local sleep_interval="${4:-5}" # Default sleep interval to 5 seconds if not provided
+
+            echo "Checking availability of $friendly_name at $service_host:$service_port..."
+
+            while ! nc -z "$service_host" "$service_port"; do
+              echo "$friendly_name is not available at $service_host:$service_port. Retrying in $sleep_interval seconds..."
+              sleep "$sleep_interval"
+            done
+
+            echo "$friendly_name is now available at $service_host:$service_port."
+          }
+
+          wait_for_service "Redis" {{ include "neurox-control-manager.redis.service" . }} {{ include "neurox-control-manager.redis.port" . }}
+          wait_for_service "Relay Server" {{ include "neurox-control-manager.relay.serviceName" . }} {{ .Values.global.relay.apiPort }}
+          wait_for_service "API" {{ include "neurox-control-manager.api.serviceName" . }} {{ include "neurox-control-manager.api.servicePort" . }}
+      containers:
+      - name: neurox-control-manager
+        image: '{{ include "neurox-control-manager.image.run.registry" . }}:{{ default .Chart.AppVersion .Values.image.run.tag }}'
+        imagePullPolicy: '{{ include "neurox-control-manager.image.run.pullPolicy" . }}'
+        env:
+        - name: API_INTERNAL_HOST
+          value: 'http://{{ include "neurox-control-manager.api.serviceName" . }}:{{ include "neurox-control-manager.api.servicePort" . }}'
+        - name: LOG_LEVEL
+          value: '{{ .Values.global.log.level }}'
+        - name: NODE_ENV
+          value: '{{ .Values.global.nodeEnv }}'
+        - name: PRETTY_LOGS
+          value: '{{ .Values.global.log.pretty }}'
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.global.redis.secret.name }}"
+              key: "{{ .Values.global.redis.secret.key }}"
+        - name: REDIS_HOSTS
+          value: '{{ include "neurox-control-manager.redis.hosts" . }}'
+        - name: REDIS_MASTER
+          value: mymaster
+        - name: REDIS_SENTINELS
+          value: 'true'
+        - name: RELAY_URL
+          value: '{{ include "neurox-control-manager.relay.url" . }}'
+        - name: SCHEDULER_QUEUE
+          value: '{{ .Values.global.scheduler.queueName }}'
+      enableServiceLinks: false
+    {{- if .Values.global.scheduling.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.global.scheduling.nodeSelector | nindent 8 }}
+    {{- end }}
+      serviceAccountName: '{{ include "neurox-control-manager.fullname" . }}'
+    {{- if .Values.global.scheduling.tolerations }}
+      tolerations: {{ toYaml .Values.global.scheduling.tolerations | nindent 8 }}
+    {{- end }}

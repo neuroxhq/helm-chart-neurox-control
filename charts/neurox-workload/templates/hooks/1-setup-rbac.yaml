@@ -1,0 +1,113 @@
+{{- if .Values.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "1"
+  name: '{{ include "neurox-workload.fullname" . }}-setup-job-hook'
+  namespace: "{{ .Release.Namespace }}"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "1"
+  name: '{{ include "neurox-workload.fullname" . }}-setup-job-hook'
+  namespace: "{{ .Release.Namespace }}"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - "configmaps"
+    verbs:
+      - "get"
+      - "create"
+{{- if .Values.prometheus.enabled }}
+  - apiGroups:
+      - "monitoring.coreos.com"
+    resources:
+      - "prometheuses"
+    verbs:
+      - "create"
+      - "get"
+      - "patch"
+      - "update"
+      - "watch"
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "2"
+  name: '{{ include "neurox-workload.fullname" . }}-setup-job-hook'
+  namespace: "{{ .Release.Namespace }}"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: '{{ include "neurox-workload.fullname" . }}-setup-job-hook'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "neurox-workload.fullname" . }}-setup-job-hook'
+{{- if .Values.prometheus.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "1"
+  name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+  namespace: "{{ .Release.Namespace }}"
+---
+# Used to scrape prometheus metrics
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "1"
+  name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - nodes/metrics
+      - pods
+      - endpoints
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - nonResourceURLs:
+      - /metrics
+      - /metrics/cadvisor
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "2"
+  name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+    namespace: "{{ .Release.Namespace }}"
+{{- end }}
+{{- end }}

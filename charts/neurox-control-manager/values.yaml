@@ -1,0 +1,38 @@
+global:
+  domain: ''
+  image:
+    # Required to be set by parent chart
+    baseRegistry: registry.neurox.com
+    pullPolicy: Always
+    pullSecretName: neurox-image-registry
+  redis:
+    fullnameOverride: ''
+    secret:
+      name: neurox-control-redis
+      key: password
+  relay:
+    apiPort: 7080
+  scheduler:
+    queueName: Scheduler
+  scheduling:
+    affinity: {}
+    nodeSelector: {}
+    tolerations: []
+  nodeEnv: production
+  log:
+    level: info
+    pretty: true
+
+api:
+  serviceOverride:
+    host:
+    port:
+image:
+  init:
+    pullPolicy: ''
+    repository: busybox
+    tag: 1.37.0-glibc
+  run:
+    pullPolicy: ''
+    repository: control-manager
+replicaCount: 1

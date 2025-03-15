@@ -1,0 +1,252 @@
+{{- $annotationsIdp := include "neurox-control.idp.annotations" . | fromYaml -}}
+{{- $annotationsMetrics := include "neurox-control.metrics.annotations" . | fromYaml -}}
+{{- $annotationsRelay := include "neurox-control.relay.annotations" . | fromYaml -}}
+{{- $annotationsSso := include "neurox-control.sso.annotations" . | fromYaml -}}
+{{- $className := .Values.global.ingress.className -}}
+{{- $controlFullName := include "neurox-control.fullname" . -}}
+{{- $hostPrimary := include "neurox-control.host.primary" . -}}
+{{- $hostSecondary := include "neurox-control.host.secondary" . -}}
+{{- $hostsAll := include "neurox-control.host.all" . | split "," -}}
+{{- $issuerName := .Values.global.ingress.issuerName -}}
+{{- $relayPort := .Values.relay.service.relayPort -}}
+{{- $thanosFullName := .Values.global.thanos.fullnameOverride -}}
+{{- $tlsSecretName := .Values.global.ingress.tlsSecretName -}}
+{{- $useNeuroxIssuer := (and .Values.global.ingress.useNeuroxIssuer (include "neurox-control.useNeuroxDomain" .)) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+  {{- range $key, $value := $annotationsIdp }}
+    {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- if $useNeuroxIssuer}}
+    cert-manager.io/issuer: "{{ $className }}"
+  {{- end }}
+  name: "{{ $controlFullName }}-idp"
+spec:
+  ingressClassName: "{{ $className }}"
+  rules:
+    - host: {{ $hostPrimary }}
+      http:
+        paths:
+        - path: /idp
+          pathType: Prefix
+          backend:
+            service:
+              name: "{{ $controlFullName }}-idp"
+              port:
+                name: http
+  tls:
+    - hosts:
+      {{- range $hostsAll }}
+        - {{ . }}
+      {{- end }}
+      secretName: {{ $tlsSecretName }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+  {{- range $key, $value := $annotationsIdp }}
+    {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- if $useNeuroxIssuer}}
+    cert-manager.io/issuer: "{{ $issuerName }}"
+  {{- end }}
+    nginx.ingress.kubernetes.io/permanent-redirect: "/signin?$query_string"
+    nginx.ingress.kubernetes.io/permanent-redirect-code: "301"
+  name: "{{ $controlFullName }}-idp-local"
+spec:
+  ingressClassName: "{{ $className }}"
+  rules:
+    - host: {{ $hostPrimary }}
+      http:
+        paths:
+        - path: /idp/auth/local/login
+          pathType: Exact
+          backend:
+            # Does not actually route to this service due to redirect annotation
+            service:
+              name: "{{ $controlFullName }}-idp"
+              port:
+                name: http
+  tls:
+    - hosts:
+      {{- range $hostsAll }}
+        - {{ . }}
+      {{- end }}
+      secretName: {{ $tlsSecretName }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+  {{- range $key, $value := $annotationsIdp }}
+    {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- if $useNeuroxIssuer}}
+    cert-manager.io/issuer: "{{ $issuerName }}"
+  {{- end }}
+    nginx.ingress.kubernetes.io/rewrite-target: "/idp/auth/local/login"
+  name: "{{ $controlFullName }}-idp-signin-local"
+spec:
+  ingressClassName: "{{ $className }}"
+  rules:
+    - host: {{ $hostPrimary }}
+      http:
+        paths:
+        - path: /signin/local
+          pathType: Exact
+          backend:
+            service:
+              name: "{{ $controlFullName }}-idp"
+              port:
+                name: http
+  tls:
+    - hosts:
+      {{- range $hostsAll }}
+        - {{ . }}
+      {{- end }}
+      secretName: {{ $tlsSecretName }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+  {{- range $key, $value := $annotationsSso }}
+    {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- if $useNeuroxIssuer}}
+    cert-manager.io/issuer: "{{ $issuerName }}"
+  {{- end }}
+  name: "{{ $controlFullName }}-sso"
+spec:
+  ingressClassName: "{{ $className }}"
+  rules:
+    - host: {{ $hostPrimary }}
+      http:
+        paths:
+        - path: /sso
+          pathType: Prefix
+          backend:
+            service:
+              name: "{{ $controlFullName }}-sso"
+              port:
+                number: 80
+  tls:
+    - hosts:
+      {{- range $hostsAll }}
+        - {{ . }}
+      {{- end }}
+      secretName: {{ $tlsSecretName }}
+{{- if .Values.metrics.ingress.enabled }}
+---
+# Ingress used to receive remote workload cluster metrics
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: "{{ $controlFullName }}-metrics"
+  annotations:
+    nginx.ingress.kubernetes.io/client-body-buffer-size: 1m
+    nginx.ingress.kubernetes.io/rewrite-target: /api/v1/receive
+  {{- range $key, $value := $annotationsMetrics }}
+    {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- if $useNeuroxIssuer}}
+    cert-manager.io/issuer: "{{ $issuerName }}"
+  {{- end }}
+spec:
+  ingressClassName: "{{ $className }}"
+  rules:
+  {{- range $hostsAll }}
+    - host: {{ . }}
+      http:
+        paths:
+        - path: /metrics/v1/receive
+          pathType: Exact
+          backend:
+            service:
+              name: "{{ $thanosFullName }}-receive"
+              port:
+                name: remote
+  {{- end }}
+  tls:
+    - hosts:
+      {{- range $hostsAll }}
+        - {{ . }}
+      {{- end }}
+      secretName: {{ $tlsSecretName }}
+{{- end }}
+{{- if .Values.relay.ingress.enabled }}
+---
+# Used by the relay server to receive connections from remote workload clusters
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: '{{ $controlFullName }}-relay-server'
+  annotations:
+  {{- range $key, $value := $annotationsRelay }}
+    {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- if $useNeuroxIssuer}}
+    cert-manager.io/issuer: "{{ $issuerName }}"
+  {{- end }}
+spec:
+  ingressClassName: "{{ $className }}"
+  rules:
+  {{- range $hostsAll }}
+    - host: {{ . }}
+      http:
+        paths:
+        - path: /ws
+          pathType: Exact
+          backend:
+            service:
+              name: '{{ $controlFullName }}-relay-server'
+              port:
+                number: {{ $relayPort }}
+  {{- end }}
+  tls:
+    - hosts:
+      {{- range $hostsAll }}
+        - {{ . }}
+      {{- end }}
+      secretName: {{ $tlsSecretName }}
+{{- end }}
+{{- if $hostSecondary }}
+---
+# Force secondary domain redirect to primary domain except for declared endpoints
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: '{{ $controlFullName }}-redirect'
+  annotations:
+  {{- range $key, $value := $annotationsRelay }}
+    {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- if $useNeuroxIssuer}}
+    cert-manager.io/issuer: "{{ $issuerName }}"
+  {{- end }}
+    nginx.ingress.kubernetes.io/permanent-redirect: 'https://{{ $hostPrimary }}'
+    nginx.ingress.kubernetes.io/permanent-redirect-code: "301"
+spec:
+  ingressClassName: "{{ $className }}"
+  rules:
+    - host: {{ $hostSecondary }}
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: "{{ $controlFullName }}-idp"
+              port:
+                name: http
+  tls:
+    - hosts:
+      {{- range $hostsAll }}
+        - {{ . }}
+      {{- end }}
+      secretName: {{ $tlsSecretName }}
+{{- end }}

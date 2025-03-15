@@ -1,0 +1,36 @@
+global:
+  domain: ''
+  vanityDomain: ''
+  fullnameOverride: ''
+  image:
+    # Required to be set by parent chart
+    # baseRegistry: registry.neurox.com
+    pullPolicy: Always
+    pullSecretName: neurox-image-registry
+  ingress:
+    annotations: {}
+    className: nginx
+    issuerName: neurox-control
+    tlsSecretName: neurox-control-tls
+    useNeuroxIssuer: true
+  # Control where pods run
+  scheduling:
+    affinity: {}
+    nodeSelector: {}
+    tolerations: []
+
+fullnameOverride: ''
+envOverride:
+  intercomAppId: ''
+image:
+  repository: control-portal
+  # defaults to the chart version but can be overridden
+  #tag: latest
+  pullPolicy: ''
+ingress:
+  annotations: {}
+  host: ''
+  tlsSecretName: ''
+replicaCount: 1
+service:
+  port: 80

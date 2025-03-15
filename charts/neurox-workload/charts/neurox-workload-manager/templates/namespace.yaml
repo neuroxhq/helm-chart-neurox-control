@@ -1,0 +1,11 @@
+{{- range .Values.workloadNamespaces }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    neurox.com/workload.namespace: 'true'
+  labels:
+    neurox.com/workload.namespace: 'true'
+  name: {{ . }}
+{{- end }}
