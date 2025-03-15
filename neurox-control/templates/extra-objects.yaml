@@ -1,4 +1,0 @@
-{{ range .Values.global.extraObjects }}
----
-{{ tpl . $ }}
-{{ end }}

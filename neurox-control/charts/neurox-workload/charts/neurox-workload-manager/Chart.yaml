@@ -1,5 +1,0 @@
-apiVersion: v2
-appVersion: 2.17.0
-description: A Helm chart for deploying the Neurox Workload Manager
-name: neurox-workload-manager
-version: 2.17.0
