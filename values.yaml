@@ -1,4 +1,5 @@
 global:
+  defaultStorageClass: ""
   domain: ""
   fullnameOverride: ""
   identityProviders:
@@ -179,6 +180,7 @@ register:
   service:
     port: 80
     type: ClusterIP
+  useExternalIP: false
 relay:
   image:
     init:

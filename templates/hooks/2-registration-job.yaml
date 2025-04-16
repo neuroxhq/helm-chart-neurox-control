@@ -40,10 +40,31 @@ spec:
                 kubectl get ingress "${ingress_name}" -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
               }
 
+              get_external_ip() {
+                printf "GET / HTTP/1.1\r\nHost: ifconfig.me\r\nConnection: close\r\n\r\n" | \
+                openssl s_client -quiet -connect ifconfig.me:443 2>/dev/null | \
+                awk '/ip_addr:/ {print $2}'
+              }
+
               DOMAIN_ALREADY_REGISTERED=''
               API_LB_HOSTNAME=$(get_lb_hostname ${API_INGRESS})
               API_LB_IP=$(get_lb_ip ${API_INGRESS})
-              if [ -n "${API_LB_HOSTNAME}" ]
+
+              if [ -n "$USE_EXTERNAL_IP" ]
+              then
+                echo "Retrieving external IP address..."
+                EXTERNAL_IP=$(get_external_ip)
+                if [ -z "${EXTERNAL_IP}" ]
+                then
+                  echo "Failed to retrieve external IP address"
+                  exit 1
+                fi
+                if getent hosts "${NEUROX_DOMAIN}" | awk '{print $1}' | grep -q -x "${EXTERNAL_IP}"
+                then
+                  echo "${NEUROX_DOMAIN} already registered to external IP: ${EXTERNAL_IP}"
+                  DOMAIN_ALREADY_REGISTERED='true'
+                fi
+              elif [ -n "${API_LB_HOSTNAME}" ]
               then
                 echo "API LoadBalancer is using hostname ${API_LB_HOSTNAME}"
                 if getent hosts "${NEUROX_DOMAIN}" | awk '{print $2}' | grep -q -x "${API_LB_HOSTNAME}"
@@ -99,6 +120,7 @@ spec:
                   exit 1
               fi
 
+
               attempt=1
               while [ "$attempt" -le "${MAX_RETRIES}" ]
               do
@@ -112,25 +134,53 @@ spec:
                   echo "Successfully retrieved ${REGISTRATION_INGRESS} LoadBalancer hostname: ${LB_HOSTNAME}"
                   echo "{\"hostname\": \"${LB_HOSTNAME}\"}" > "${LOCATION_FILE}"
                   echo "Hostname address written to ${LOCATION_FILE}"
-                  exit 0
+                  if [ -n "$USE_EXTERNAL_IP" ]
+                  then
+                    break
+                  else
+                    exit 0
+                  fi
                 elif [ -n "${LB_IP}" ]
                 then
                   echo "Successfully retrieved ${REGISTRATION_INGRESS} LoadBalancer IP: ${LB_IP}"
                   echo "{\"ip\": \"${LB_IP}\"}" > "${LOCATION_FILE}"
                   echo "IP address written to ${LOCATION_FILE}"
-                  exit 0
+                  if [ -n "$USE_EXTERNAL_IP" ]
+                  then
+                    break
+                  else
+                    exit 0
+                  fi
                 else
                   echo "Failed to retrieve ingress LoadBalancer location. Retrying in ${RETRY_INTERVAL} seconds..."
                   sleep "${RETRY_INTERVAL}"
                 fi
-
                 # Increment the attempt counter
                 attempt=$((attempt + 1))
               done
 
+              if [ -n "$USE_EXTERNAL_IP" ]
+              then
+                echo "Retrieving external IP address..."
+                EXTERNAL_IP=$(get_external_ip)
+                if [ -n "$EXTERNAL_IP" ]
+                then
+                  echo "Successfully retrieved external IP address: ${EXTERNAL_IP}"
+                  echo "{\"ip\": \"${EXTERNAL_IP}\"}" > "${LOCATION_FILE}"
+                  echo "IP address written to ${LOCATION_FILE}"
+                else
+                  echo "Failed to retrieve external IP address, falling back to ingress status details"
+                fi
+                exit 0
+              fi
+
               echo "Failed to retrieve ingress LoadBalancer location, exiting with failure..."
               exit 1
           env:
+          {{- if .Values.register.useExternalIP }}
+            - name: USE_EXTERNAL_IP
+              value: 'true'
+          {{- end }}
             - name: LOCATION_FILE
               value: /shared/location.json
             - name: NEUROX_DOMAIN
@@ -177,6 +227,8 @@ spec:
             - name: NEUROX_VANITY_DOMAIN
               value: "{{ .Values.global.vanityDomain }}"
           {{- end }}
+            - name: NODE_ENV
+              value: "{{ .Values.global.nodeEnv }}"
           {{- if .Values.global.publicKey }}
             - name: PUBLIC_KEY
               value: "{{ .Values.global.publicKey }}"

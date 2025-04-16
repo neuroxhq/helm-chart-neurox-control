@@ -4,12 +4,12 @@ dependencies:
 - alias: agent
   condition: agent.enabled,enabled
   name: neurox-workload-agent
-  repository: oci://ghcr.io/neuroxhq/dev-helm-charts
+  repository: oci://ghcr.io/neuroxhq/helm-charts
   version: 2.10.0
 - alias: manager
   condition: manager.enabled,enabled
   name: neurox-workload-manager
-  repository: oci://ghcr.io/neuroxhq/dev-helm-charts
+  repository: oci://ghcr.io/neuroxhq/helm-charts
   version: 2.18.0
 description: A Helm chart for deploying the Neurox Workload Cluster
 name: neurox-workload

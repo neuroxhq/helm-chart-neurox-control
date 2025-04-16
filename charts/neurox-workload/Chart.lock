@@ -1,9 +1,9 @@
 dependencies:
 - name: neurox-workload-agent
-  repository: oci://ghcr.io/neuroxhq/dev-helm-charts
+  repository: oci://ghcr.io/neuroxhq/helm-charts
   version: 2.10.0
 - name: neurox-workload-manager
-  repository: oci://ghcr.io/neuroxhq/dev-helm-charts
+  repository: oci://ghcr.io/neuroxhq/helm-charts
   version: 2.18.0
-digest: sha256:05ae2d8a50fd6ef614f54018820648e64e917886d917d88b84cd2fd51e37c42b
-generated: "2025-04-03T19:04:33.781514237Z"
+digest: sha256:72275d4afaddfbd08045d019076655fdc6a621ccb83874865771cbe1f7c73696
+generated: "2025-04-16T05:06:01.498258338Z"

@@ -6,7 +6,7 @@ global:
     key: clusterId
 
   image:
-    baseRegistry: registry.neuroxhq.com
+    baseRegistry: registry.neurox.com
     pullPolicy: Always
     pullSecretName: neurox-image-registry
 
