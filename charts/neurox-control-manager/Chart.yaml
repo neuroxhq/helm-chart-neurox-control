@@ -1,5 +1,5 @@
 apiVersion: v2
-appVersion: 1.138.2
+appVersion: 1.142.0
 description: A Helm chart for deploying the Neurox Control Manager
 name: neurox-control-manager
-version: 1.138.2
+version: 1.142.0

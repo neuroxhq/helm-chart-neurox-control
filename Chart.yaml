@@ -1,15 +1,15 @@
 apiVersion: v2
-appVersion: 2.0.152
+appVersion: 2.0.186
 dependencies:
 - alias: api
   name: neurox-control-api
   repository: oci://ghcr.io/neuroxhq/helm-charts
-  version: 2.217.0
+  version: 2.226.1
 - alias: portal
   condition: portal.enabled
   name: neurox-control-portal
   repository: oci://ghcr.io/neuroxhq/helm-charts
-  version: 1.248.3
+  version: 1.252.0
 - name: redis
   repository: oci://registry-1.docker.io/bitnamicharts
   version: 20.11.3
@@ -17,7 +17,7 @@ dependencies:
   condition: manager.enabled
   name: neurox-control-manager
   repository: oci://ghcr.io/neuroxhq/helm-charts
-  version: 1.138.2
+  version: 1.142.0
 - condition: thanos.enabled
   name: thanos
   repository: oci://registry-1.docker.io/bitnamicharts
@@ -25,7 +25,7 @@ dependencies:
 - alias: workload
   name: neurox-workload
   repository: oci://ghcr.io/neuroxhq/helm-charts
-  version: 2.0.0
+  version: 2.0.1
 description: A Helm chart for deploying the Neurox Control Cluster
 name: neurox-control
-version: 2.0.152
+version: 2.0.186

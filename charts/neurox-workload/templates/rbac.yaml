@@ -1,0 +1,45 @@
+{{- if .Values.prometheus.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+  namespace: "{{ .Release.Namespace }}"
+---
+# Used to scrape prometheus metrics
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - nodes/metrics
+      - pods
+      - endpoints
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - nonResourceURLs:
+      - /metrics
+      - /metrics/cadvisor
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+subjects:
+  - kind: ServiceAccount
+    name: '{{ include "neurox-workload.fullname" . }}-prometheus'
+    namespace: "{{ .Release.Namespace }}"
+{{- end }}

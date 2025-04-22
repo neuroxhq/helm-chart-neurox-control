@@ -1,8 +1,10 @@
 {{- $annotations := include "neurox-control-api.annotations" . | fromYaml -}}
 {{- $apiFullName := include "neurox-control-api.fullname" . -}}
 {{- $apiPort := .Values.service.port -}}
+{{- $className := .Values.global.ingress.className -}}
 {{- $hostPrimary := include "neurox-control-api.host.primary" . -}}
 {{- $hostsAll := include "neurox-control-api.host.all" . | split "," -}}
+{{- $issuerName := .Values.global.ingress.issuerName -}}
 {{- $ssoHeaders := include "neurox-control-api.sso.headers" . -}}
 {{- $tlsSecretName := include "neurox-control-api.tlsSecretName" . -}}
 {{- $useNeuroxIssuer := (and .Values.global.ingress.useNeuroxIssuer (include "neurox-control-api.useNeuroxDomain" .)) }}
@@ -20,10 +22,10 @@ metadata:
     {{ $key }}: {{ $value | quote }}
   {{- end }}
   {{- if $useNeuroxIssuer }}
-    cert-manager.io/issuer: "{{ .Values.global.ingress.issuerName }}"
+    cert-manager.io/issuer: "{{ $issuerName }}"
   {{- end }}
 spec:
-  ingressClassName: "{{ .Values.global.ingress.className }}"
+  ingressClassName: "{{ $className }}"
   rules:
     - host: {{ $hostPrimary }}
       http:
@@ -52,10 +54,10 @@ metadata:
     {{ $key }}: {{ $value | quote }}
   {{- end }}
   {{- if $useNeuroxIssuer }}
-    cert-manager.io/issuer: "{{ .Values.global.ingress.issuerName }}"
+    cert-manager.io/issuer: "{{ $issuerName }}"
   {{- end }}
 spec:
-  ingressClassName: "{{ .Values.global.ingress.className }}"
+  ingressClassName: "{{ $className }}"
   rules:
   {{- range $hostsAll }}
     - host: {{ . }}
@@ -86,10 +88,10 @@ metadata:
     {{ $key }}: {{ $value | quote }}
   {{- end }}
   {{- if $useNeuroxIssuer }}
-    cert-manager.io/issuer: "{{ .Values.global.ingress.issuerName }}"
+    cert-manager.io/issuer: "{{ $issuerName }}"
   {{- end }}
 spec:
-  ingressClassName: "{{ .Values.global.ingress.className }}"
+  ingressClassName: "{{ $className }}"
   rules:
     - host: {{ $hostPrimary }}
       http:
@@ -102,6 +104,20 @@ spec:
                 port:
                   number: {{ $apiPort }}
           - path: /api/signin-options
+            pathType: Exact
+            backend:
+              service:
+                name: "{{ $apiFullName }}"
+                port:
+                  number: {{ $apiPort }}
+          - path: /idp/auth/local/login
+            pathType: Exact
+            backend:
+              service:
+                name: "{{ $apiFullName }}"
+                port:
+                  number: {{ $apiPort }}
+          - path: /signout
             pathType: Exact
             backend:
               service:

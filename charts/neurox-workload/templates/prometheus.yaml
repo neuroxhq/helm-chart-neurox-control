@@ -1,0 +1,41 @@
+{{- if .Values.prometheus.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: '{{ include "neurox-workload.fullname" . }}-metrics-forwarder'
+  namespace: "{{ .Release.Namespace }}"
+spec:
+  replicas: 1
+  scrapeInterval: 15s
+  evaluationInterval: 15s
+  remoteWrite:
+    - url: '{{ include "neurox-workload.prometheus.remoteWriteUrl" . }}'
+      writeRelabelConfigs:
+        - sourceLabels: [__name__]
+          regex: '{{ include "neurox-workload.prometheus.metricFilter" . }}'
+          action: keep
+  serviceAccountName: '{{ include "neurox-workload.fullname" . }}-prometheus'
+  serviceMonitorNamespaceSelector: {}
+  serviceMonitorSelector: {}
+  initContainers:
+    - name: init-config-reloader
+      env:
+        - name: CLUSTER_ID
+          valueFrom:
+            configMapKeyRef:
+              name: "{{ .Values.global.configmap.name }}"
+              key: "{{ .Values.global.configmap.key }}"
+  containers:
+    - name: config-reloader
+      env:
+        - name: CLUSTER_ID
+          valueFrom:
+            configMapKeyRef:
+              name: "{{ .Values.global.configmap.name }}"
+              key: "{{ .Values.global.configmap.key }}"
+  enableFeatures:
+    - expand-external-labels
+  externalLabels:
+    neurox_cluster: $(CLUSTER_ID)
+{{- end }}

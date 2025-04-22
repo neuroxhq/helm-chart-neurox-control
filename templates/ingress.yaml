@@ -21,7 +21,7 @@ metadata:
     {{ $key }}: {{ $value | quote }}
   {{- end }}
   {{- if $useNeuroxIssuer}}
-    cert-manager.io/issuer: "{{ $className }}"
+    cert-manager.io/issuer: "{{ $issuerName }}"
   {{- end }}
   name: "{{ $controlFullName }}-idp"
 spec:
@@ -33,40 +33,6 @@ spec:
         - path: /idp
           pathType: Prefix
           backend:
-            service:
-              name: "{{ $controlFullName }}-idp"
-              port:
-                name: http
-  tls:
-    - hosts:
-      {{- range $hostsAll }}
-        - {{ . }}
-      {{- end }}
-      secretName: {{ $tlsSecretName }}
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-  {{- range $key, $value := $annotationsIdp }}
-    {{ $key }}: {{ $value | quote }}
-  {{- end }}
-  {{- if $useNeuroxIssuer}}
-    cert-manager.io/issuer: "{{ $issuerName }}"
-  {{- end }}
-    nginx.ingress.kubernetes.io/permanent-redirect: "/signin?$query_string"
-    nginx.ingress.kubernetes.io/permanent-redirect-code: "301"
-  name: "{{ $controlFullName }}-idp-local"
-spec:
-  ingressClassName: "{{ $className }}"
-  rules:
-    - host: {{ $hostPrimary }}
-      http:
-        paths:
-        - path: /idp/auth/local/login
-          pathType: Exact
-          backend:
-            # Does not actually route to this service due to redirect annotation
             service:
               name: "{{ $controlFullName }}-idp"
               port:

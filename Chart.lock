@@ -1,21 +1,21 @@
 dependencies:
 - name: neurox-control-api
   repository: oci://ghcr.io/neuroxhq/helm-charts
-  version: 2.217.0
+  version: 2.226.1
 - name: neurox-control-portal
   repository: oci://ghcr.io/neuroxhq/helm-charts
-  version: 1.248.3
+  version: 1.252.0
 - name: redis
   repository: oci://registry-1.docker.io/bitnamicharts
   version: 20.11.3
 - name: neurox-control-manager
   repository: oci://ghcr.io/neuroxhq/helm-charts
-  version: 1.138.2
+  version: 1.142.0
 - name: thanos
   repository: oci://registry-1.docker.io/bitnamicharts
   version: 15.13.2
 - name: neurox-workload
   repository: oci://ghcr.io/neuroxhq/helm-charts
-  version: 2.0.0
-digest: sha256:3a7690c58d87d7257ef2278ba258d78cdf82dd3d31e2da72af2b7c0517c3e2bb
-generated: "2025-04-18T01:00:36.430012168Z"
+  version: 2.0.1
+digest: sha256:fabdcdb962938a56aa3bf4a8a907f7b358926b077feefe387bc41cb521f5ab1a
+generated: "2025-04-22T23:22:34.571206869Z"
