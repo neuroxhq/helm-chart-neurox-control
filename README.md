@@ -34,9 +34,10 @@ Prior to installing Neurox, you'll need an existing Kubernetes cluster with at l
 
 ### Application Prerequisites
 
-At a minimum you will need both cert-manager and ingress-nginx to run the Neurox control chart.
+At a minimum you will need both __cert-manager__ and __ingress-nginx__ to run the Neurox control chart.
 
-*Cert Manager*
+__Cert Manager__
+
 Required for automated provisioning of Neurox SSL/TLS certificates. Install with:
 ```
 helm repo add jetstack https://charts.jetstack.io --force-update
@@ -45,7 +46,8 @@ helm install --create-namespace -n cert-manager cert-manager jetstack/cert-manag
 ```
 For more information on how to configure cert-manager: https://cert-manager.io/docs/installation/helm/
 
-*Ingress Nginx*
+__Ingress Nginx__
+
 Required to access the Neurox web portal. Install with:
 ```
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -54,9 +56,10 @@ helm install --create-namespace -n ingress-nginx ingress-nginx ingress-nginx/ing
 ```
 For more information on how to configure ingress-nginx: https://github.com/kubernetes/ingress-nginx/tree/main/charts/ingress-nginx
 
-For your workload cluster, you will need the NVIDIA GPU operator and Kube Prometheus stack. By default, the install instructions bundle the [Neurox workload helm chart](https://github.com/neuroxhq/helm-chart-neurox-workload) with the Neurox control helm chart. You can change this behavior by simply omitting the `--set workload.enabled=true` parameter in the Neurox control helm chart install command.
+For the Neurox workload component, you will need the NVIDIA GPU operator and Kube Prometheus stack. By default, the install instructions bundle the [Neurox workload helm chart](https://github.com/neuroxhq/helm-chart-neurox-workload) with the Neurox control helm chart. You can change this behavior by simply omitting the `--set workload.enabled=true` parameter in the Neurox control helm chart install command.
 
-*NVIDIA GPU Operator*
+__NVIDIA GPU Operator__
+
 Required to run GPU workloads. Install with:
 ```
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
@@ -65,11 +68,13 @@ helm install --create-namespace -n gpu-operator gpu-operator nvidia/gpu-operator
 ```
 For more information on how to configure NVIDIA GPU operator: https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/getting-started.html#procedure
 
-*Kube Prometheus Stack*
+__Kube Prometheus Stack__
+
 Required to gather metrics. Install with:
 ```
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
+# This is the minimum required configuration. Feel free to enable components if you need them.
 helm install --create-namespace -n monitoring kube-prometheus-stack prometheus-community/kube-prometheus-stack --set alertmanager.enabled=false --set grafana.enabled=false --set prometheus.enabled=false
 ```
 For more information on how to configure kube-prometheus-stack: https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-state-metrics
@@ -79,12 +84,12 @@ For more information on how to configure kube-prometheus-stack: https://github.c
 Below is an example of how to install Neurox control plane and workload cluster using Helm:
 ```
 # Replace with actual values
-NEUROX_DOMAIN=random-words.goneurox.com
-INSTALL_KEY=i_abcdef123456
+NEUROX_DOMAIN=replace-this.goneurox.com
+INSTALL_KEY=i_replacewithinstallkey
 NEUROX_HELM_REGISTRY=oci://ghcr.io/neuroxhq/helm-charts
 NEUROX_IMAGE_REGISTRY=registry.neurox.com
-NEUROX_USERNAME=random-words-goneurox-com
-NEUROX_PASSWORD=abcdef123456
+NEUROX_USERNAME=replace-this-goneurox-com
+NEUROX_PASSWORD=replacewithpassword
 
 kubectl create ns neurox
 kubectl create secret generic -n neurox neurox-control-license --from-literal=install-key=${INSTALL_KEY}
