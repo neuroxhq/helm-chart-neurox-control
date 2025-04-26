@@ -1,5 +1,5 @@
 apiVersion: v2
-appVersion: 2.233.0
+appVersion: 2.233.1
 description: A Helm chart for deploying the Neurox Control API
 name: neurox-control-api
-version: 2.233.0
+version: 2.233.1

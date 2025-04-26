@@ -1,0 +1,46 @@
+{{- if .Values.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: '{{ include "neurox-workload.fullname" . }}-cleanup-job-hook'
+  namespace: "{{ .Release.Namespace }}"
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "4"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+    {{- if .Values.global.scheduling.affinity }}
+      affinity: {{ toYaml .Values.global.scheduling.affinity | nindent 8 }}
+    {{- end }}
+      containers:
+        - name: rbac-cleanup
+          image: "{{ .Values.hooks.image.repository }}:{{ .Values.hooks.image.tag }}"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Cleaning up setup job hook resources..."
+              kubectl delete rolebinding {{ include "neurox-workload.fullname" . }}-setup-job-hook -n ${NAMESPACE}
+              kubectl delete role {{ include "neurox-workload.fullname" . }}-setup-job-hook -n ${NAMESPACE}
+              kubectl delete serviceaccount {{ include "neurox-workload.fullname" . }}-setup-job-hook -n ${NAMESPACE}
+
+              echo "Cleaning up cleanup job rolebinding..."
+              kubectl delete rolebinding {{ include "neurox-workload.fullname" . }}-cleanup-job-hook -n ${NAMESPACE}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+    {{- if .Values.global.scheduling.nodeSelector }}
+      nodeSelector: {{ toYaml .Values.global.scheduling.nodeSelector | nindent 8 }}
+    {{- end }}
+      restartPolicy: Never
+      serviceAccountName: '{{ include "neurox-workload.fullname" . }}-cleanup-job-hook'
+    {{- if .Values.global.scheduling.tolerations }}
+      tolerations: {{ toYaml .Values.global.scheduling.tolerations | nindent 8 }}
+    {{- end }}
+{{- end }}

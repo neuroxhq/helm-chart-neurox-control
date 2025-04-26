@@ -69,9 +69,18 @@ spec:
                 port:
                   number: {{ $portalPort }}
           {{- end }}
-          {{- range $exactPath := list "/favicon.ico" "/signin" "/site.webmanifest" }}
+          {{- range $exactPath := list "/signin" }}
           - path: {{ $exactPath }}
             pathType: Exact
+            backend:
+              service:
+                name: {{ $portalFullName }}
+                port:
+                  number: {{ $portalPort }}
+          {{- end }}
+          {{- range $implementationPath := list "/favicon.ico" "/site.webmanifest" }}
+          - path: {{ $implementationPath }}
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: {{ $portalFullName }}

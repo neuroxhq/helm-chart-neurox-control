@@ -1,7 +1,7 @@
 global:
   image:
     # Required to be set by parent chart
-    # baseRegistry: registry.neurox.com
+    baseRegistry: registry.neurox.com
     pullPolicy: Always
     pullSecretName: neurox-image-registry
 
