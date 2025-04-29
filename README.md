@@ -2,6 +2,8 @@
 
 This Helm chart is designed to install Neurox. Neurox helps monitor your AI workloads running on your Kubernetes GPU cluster. Purpose-built dashboards and reports combine metrics and live Kubernetes runtime state data to help admins, developers, researchers, and finance auditors surface relevant insights. Visit our [main website](https://neurox.com) for information.
 
+<img src="https://neurox.com/images/67af5bf0c0a816c3a591f6d6_clusters.png" width="600" alt="Neurox GPU monitoring" />
+
 ## Get started
 To get started, follow the instructions on the [Neurox Install page](https://app.neurox.com/install). It will guide you step-by-step to a working deployment on your Kubernetes GPU cluster.
 
