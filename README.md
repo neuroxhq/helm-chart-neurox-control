@@ -1,6 +1,6 @@
 # Neurox Control Helm Chart
 
-This Helm chart is designed to install Neurox Control, a self-hosted monitoring solution for Kubernetes clusters. It provides a comprehensive set of features to monitor and manage your Kubernetes cluster, including GPU usage, resource utilization, and cost tracking.
+This Helm chart is designed to install Neurox. Neurox helps monitor your AI workloads running on your Kubernetes GPU cluster. Purpose-built dashboards and reports combine metrics and live Kubernetes runtime state data to help admins, developers, researchers, and finance auditors surface relevant insights. Visit our [main website](https://neurox.com) for information.
 
 ## Get started
 To get started, follow the instructions on the [Neurox Install page](https://app.neurox.com/install). It will guide you step-by-step to a working deployment on your Kubernetes GPU cluster.
